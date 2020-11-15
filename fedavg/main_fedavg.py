@@ -1,4 +1,5 @@
 # system python package load.
+# from logging import log
 import argparse
 import logging
 import os
@@ -16,6 +17,11 @@ import wandb
 sys.path.insert(0, os.path.abspath("/home/zzp1012/FedML")) # add the root dir of FedML
 # ************************************************************************************************************ #
 
+# ************************************************************************************************************ #
+# set the logger
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("training")
+# ************************************************************************************************************ #
 
 from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
@@ -91,6 +97,15 @@ def add_args(parser):
 
     parser.add_argument('--ci', type=int, default=0,
                         help='CI')
+# ************************************************************************************************************ #
+    # set if using debug mod
+    parser.add_argument("-v", "--verbose", action= "store_true", dest= "verbose", 
+                        help= "enable debug info output")
+    # set the scheduler method
+    parser.add_argument("-m", "--method", type= str, default="sch_random",
+                        help="declare the benchmark methods you use")
+# ************************************************************************************************************ #
+
     args = parser.parse_args()
     return args
 
@@ -108,7 +123,7 @@ def load_data(args, dataset_name):
         full_batch = False
 
     if dataset_name == "mnist":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
+        logger.info("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_mnist(args.batch_size)
@@ -118,37 +133,37 @@ def load_data(args, dataset_name):
         """
 
     elif dataset_name == "femnist":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
+        logger.info("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_emnist(args.dataset, args.data_dir)
 
     elif dataset_name == "shakespeare":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
+        logger.info("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_shakespeare(args.batch_size)
 
     elif dataset_name == "fed_shakespeare":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
+        logger.info("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_shakespeare(args.dataset, args.data_dir)
 
     elif dataset_name == "fed_cifar100":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
+        logger.info("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_cifar100(args.dataset, args.data_dir)
 
     elif dataset_name == "stackoverflow_lr":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
+        logger.info("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_stackoverflow_lr(args.dataset, args.data_dir)
 
     elif dataset_name == "stackoverflow_nwp":
-        logging.info("load_data. dataset_name = %s" % dataset_name)
+        logger.info("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_stackoverflow_nwp(args.dataset, args.data_dir)
@@ -193,28 +208,28 @@ def combine_batches(batches):
     return [(full_x, full_y)]
 
 def create_model(args, model_name, output_dim):
-    logging.info("create_model. model_name = %s, output_dim = %s" % (model_name, output_dim))
+    logger.info("create_model. model_name = %s, output_dim = %s" % (model_name, output_dim))
     model = None
     if model_name == "lr" and args.dataset == "mnist":
-        logging.info("LogisticRegression + MNIST")
+        logger.info("LogisticRegression + MNIST")
         model = LogisticRegression(28 * 28, output_dim)
     elif model_name == "cnn" and args.dataset == "femnist":
-        logging.info("CNN + FederatedEMNIST")
+        logger.info("CNN + FederatedEMNIST")
         model = CNN_DropOut(False)
     elif model_name == "resnet18_gn" and args.dataset == "fed_cifar100":
-        logging.info("ResNet18_GN + Federated_CIFAR100")
+        logger.info("ResNet18_GN + Federated_CIFAR100")
         model = resnet18()
     elif model_name == "rnn" and args.dataset == "shakespeare":
-        logging.info("RNN + shakespeare")
+        logger.info("RNN + shakespeare")
         model = RNN_OriginalFedAvg()
     elif model_name == "rnn" and args.dataset == "fed_shakespeare":
-        logging.info("RNN + fed_shakespeare")
+        logger.info("RNN + fed_shakespeare")
         model = RNN_OriginalFedAvg()
     elif model_name == "lr" and args.dataset == "stackoverflow_lr":
-        logging.info("lr + stackoverflow_lr")
+        logger.info("lr + stackoverflow_lr")
         model = LogisticRegression(10000, output_dim) 
     elif model_name == "rnn" and args.dataset == "stackoverflow_nwp":
-        logging.info("RNN + stackoverflow_nwp")
+        logger.info("RNN + stackoverflow_nwp")
         model = RNN_StackOverFlow()
     elif model_name == "resnet56":
         model = resnet56(class_num=output_dim)
@@ -224,10 +239,15 @@ def create_model(args, model_name, output_dim):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger()
-
     args = add_args(argparse.ArgumentParser(description='FedAvg-standalone'))
+
+# ************************************************************************************************************ #
+    logger.setLevel(logging.DEBUG)
+    if not args.verbose:
+        logger.setLevel(logging.INFO)
+    logger.debug("--------DEBUG enviroment start--------")
+# ************************************************************************************************************ #
+    
     logger.info(args)
     device = torch.device("cuda:" + str(args.gpu) if torch.cuda.is_available() else "cpu")
     logger.info(device)
@@ -249,18 +269,19 @@ if __name__ == "__main__":
 
 # ************************************************************************************************************ #
     # run scheduler in background.
-    os.system("python -u ./scheduler.py &")
-# ************************************************************************************************************ #
-
-# ************************************************************************************************************ #
-    time.sleep(5) # insert 1 seconds delay to make sure scheduler have alreadly been set up.
+    if not args.verbose:
+        os.system("python -u ./scheduler.py -m " + args.method + " &")
+    else:
+        os.system("python -u ./scheduler.py -m " + args.method + " -v &")
+    # insert 1 seconds delay to make sure scheduler have alreadly been set up.
+    time.sleep(5) 
 # ************************************************************************************************************ #
 
     # create model.
     # Note if the model is DNN (e.g., ResNet), the training will be very slow.
     # In this case, please use our FedML distributed version (./fedml_experiments/distributed_fedavg)
     model = create_model(args, model_name=args.model, output_dim=dataset[-1])
-    logging.info(model)
+    logger.info(model)
 
-    trainer = FedAvgTrainer(dataset, model, device, args)
+    trainer = FedAvgTrainer(dataset, model, device, args, logger)
     trainer.train()

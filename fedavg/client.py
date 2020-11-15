@@ -10,12 +10,15 @@ from torch import nn
 
 class Client:
 
-    def __init__(self, client_idx, local_training_data, local_test_data, local_sample_number, args, device):
+    def __init__(self, client_idx, local_training_data, local_test_data, local_sample_number, args, device, logger):
+# ************************************************************************************************************ #
+        self.logger = logger # set the logger
+# ************************************************************************************************************ #
         self.client_idx = client_idx
         self.local_training_data = local_training_data
         self.local_test_data = local_test_data
         self.local_sample_number = local_sample_number
-        logging.info("self.local_sample_number = " + str(self.local_sample_number))
+        self.logger.debug("self.local_sample_number = " + str(self.local_sample_number))
 
         self.args = args
         self.device = device

@@ -26,6 +26,10 @@ OPT=$12
 
 CI=$13
 
+METHOD=$14
+
+VERBOSE=$15 #-v
+
 python3 ./main_fedavg.py \
 --gpu $GPU \
 --dataset $DATASET \
@@ -39,4 +43,6 @@ python3 ./main_fedavg.py \
 --batch_size $BATCH_SIZE \
 --client_optimizer $OPT \
 --lr $LR \
---ci $CI
+--ci $CI \
+--method $METHOD \
+$VERBOSE
