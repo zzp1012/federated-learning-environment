@@ -106,7 +106,7 @@ def load_data(args, dataset_name):
         args.batch_size = 128 # temporary batch size
     else:
         full_batch = False
-    logger.info("------------dataset loading------------")
+    logger.info("-------------dataset loading------------")
 
     if dataset_name == "mnist":
         logger.debug("load_data. dataset_name = %s" % dataset_name)

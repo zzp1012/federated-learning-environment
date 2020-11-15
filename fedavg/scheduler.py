@@ -1,5 +1,6 @@
 # ************************************************************************************************************ #
 # import libraries
+import re
 import socket
 import argparse
 import numpy as np
@@ -24,7 +25,9 @@ def sch_random(round_idx, time_counter):
 
     # random sample clients
     cars = list(channel_data[channel_data['Time'] == time_counter]['Car'])
-    client_indexes = list(np.random.choice(cars, max(int(len(cars) / 2), 1), replace=False))
+    client_indexes = []
+    if cars:
+        client_indexes = list(np.random.choice(cars, max(int(len(cars) / 2), 1), replace=False).ravel())
     logger.info("client_indexes = " + str(client_indexes) + "; time_counter = " + str(time_counter))
 
     # random local iterations
@@ -43,10 +46,10 @@ def sch_channel(round_idx, time_counter):
     curr_channel = channel_data[channel_data['Time'] == time_counter]
     curr_channel = curr_channel.sort_values(by=['Distance to BS(4982,905)'], ascending=True) # sort by the channel condition
     client_indexes = (curr_channel.loc[:int((len(curr_channel) + 1)/ 2), 'Car']).tolist()
-    logger.info("client_indexes = " + str(client_indexes) + "; time_counter = " + str(time_counter))
-
+    
     # random local iterations
     local_itr = np.random.randint(2) + 1
+    logger.info("client_indexes = " + str(client_indexes) + "; time_counter = " + str(time_counter) + "; local_itr = " + str(local_itr))
 
     s_client_indexes = str(list(client_indexes))[1:-1].replace(',', '')
     s_local_itr = str(local_itr)
@@ -119,11 +122,21 @@ def main():
         client, addr = server.accept() # connected to client.
         logger.info("round " + str(round_idx) + " connected address: " + str(addr)) # print connection message.
 
-        response = client.recv(1024).decode()
+        response = client.recv(1000000).decode()
+
+        # initialization
+        loss_locals = []
+        FPF1_idx_lst = []
         
         if response != "nothing":
-            time_counter = int(response)
-
+            response = response.split(',')
+            if response[0] != '':
+                time_counter = int(float(response[0]))
+            if response[1] != '':
+                loss_locals = [float(i) for i in response[1].split(' ')]
+            if response[2] != '':
+                FPF1_idx_lst = [float(i) for i in response[2].split(' ')]
+        
         mes = scheduler(round_idx, time_counter)
         client.send(mes.encode()) # send the message to the connected client.
 
