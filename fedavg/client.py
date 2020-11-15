@@ -1,24 +1,19 @@
-import logging
-
 # ************************************************************************************************************ # newly added libraries, to record the time interval
 import time
-# ************************************************************************************************************ #
-
 import torch
 from torch import nn
 
+from config import logger
+# ************************************************************************************************************ #
 
 class Client:
 
-    def __init__(self, client_idx, local_training_data, local_test_data, local_sample_number, args, device, logger):
-# ************************************************************************************************************ #
-        self.logger = logger # set the logger
-# ************************************************************************************************************ #
+    def __init__(self, client_idx, local_training_data, local_test_data, local_sample_number, args, device):
         self.client_idx = client_idx
         self.local_training_data = local_training_data
         self.local_test_data = local_test_data
         self.local_sample_number = local_sample_number
-        self.logger.debug("self.local_sample_number = " + str(self.local_sample_number))
+        logger.debug("self.local_sample_number = " + str(self.local_sample_number))
 
         self.args = args
         self.device = device

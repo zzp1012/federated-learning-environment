@@ -40,10 +40,9 @@ def sch_channel(round_idx, time_counter):
     np.random.seed(round_idx)
 
     # sample only based on channel condition
-    cars = list(channel_data[channel_data['Time'] == time_counter]['Car'])
-
-    channel_con = 1 / channel_data[channel_data.columns[-1]]  # get the channel conditions
-    client_indexes = channel_con.nlargest(int(len(cars) / 2)).index.tolist() # number of clients set as max(int(len(cars) / 2)
+    curr_channel = channel_data[channel_data['Time'] == time_counter]
+    curr_channel = curr_channel.sort_values(by=['Distance to BS(4982,905)'], ascending=True) # sort by the channel condition
+    client_indexes = (curr_channel.loc[:int((len(curr_channel) + 1)/ 2), 'Car']).tolist()
     logger.info("client_indexes = " + str(client_indexes) + "; time_counter = " + str(time_counter))
 
     # random local iterations
@@ -61,7 +60,8 @@ def sch_rrobin(round_idx, time_counter):
     cars = list(channel_data[channel_data['Time'] == time_counter]['Car']) 
     queue.extend(cars)
     client_indexes = []
-    num_client = int(len(cars) / 2)
+    num_client = int(len(cars) / 2) + 1
+
     while len(client_indexes) < num_client:
         car_temp = queue.pop(0)
         if car_temp in cars:  # add the car exist in the current time

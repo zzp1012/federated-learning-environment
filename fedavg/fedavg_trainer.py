@@ -1,43 +1,18 @@
-import copy
-import logging
-
 # ************************************************************************************************************ # newly added libraries
-import pandas as pd
-import os
+import copy
 import socket
 import torch
-# ************************************************************************************************************ #
-
 import numpy as np
 import wandb
 
 from client import Client
-
+from config import *
 # ************************************************************************************************************ #
-# set the requirement.
-bandwith = 1
-weight = 0.5
-
-# set the data dir
-channel_data_dir = "../data"
-
-# the ratio of standalone training time over real distributed learning training time.
-timing_ratio = 10 
-
-# the ratio of radio_res
-res_ratio = 0.01
-# ************************************************************************************************************ #
-
 
 class FedAvgTrainer(object):
-    def __init__(self, dataset, model, device, args, logger):
+    def __init__(self, dataset, model, device, args):
         self.device = device
         self.args = args
-
-# ************************************************************************************************************ #
-        # set the logger in this file
-        self.logger = logger
-# ************************************************************************************************************ #
 
 # ************************************************************************************************************ #
         [client_num, train_data_num, test_data_num, train_data_global, test_data_global,
@@ -59,20 +34,17 @@ class FedAvgTrainer(object):
         self.setup_clients(train_data_local_num_dict, train_data_local_dict, test_data_local_dict)
 
 # ************************************************************************************************************ #
-        # read channel data at once.
-        self.channel_data = pd.concat([pd.read_csv(os.path.join(channel_data_dir, csv_name)) for csv_name in os.listdir(channel_data_dir)], ignore_index = True)
-
         # time counter starts from the first line
-        self.time_counter = self.channel_data['Time'][0]
+        self.time_counter = channel_data['Time'][0]
 # ************************************************************************************************************ #
 
     def setup_clients(self, train_data_local_num_dict, train_data_local_dict, test_data_local_dict):
-        self.logger.debug("############setup_clients (START)#############")
-        for client_idx in range(self.args.client_num_per_round):
+        logger.debug("############setup_clients (START)#############")
+        for client_idx in range(client_num_per_round):
             c = Client(client_idx, train_data_local_dict[client_idx], test_data_local_dict[client_idx],
-                       train_data_local_num_dict[client_idx], self.args, self.device, self.logger)
+                       train_data_local_num_dict[client_idx], self.args, self.device)
             self.client_list.append(c)
-        self.logger.debug("############setup_clients (END)#############")
+        logger.debug("############setup_clients (END)#############")
 
 # ************************************************************************************************************ # Simply setup a client to recieve the message from server.
     def client_sampling(self):
@@ -96,19 +68,6 @@ class FedAvgTrainer(object):
         local_itr = [int(i) for i in response[1].split(' ')][0]
 
         return client_indexes, local_itr
-
-# the following code is the code before the modification:
-
-    # def client_sampling(self, round_idx, client_num_in_total, client_num_per_round):
-    #     if client_num_in_total == client_num_per_round:
-    #         client_indexes = [client_index for client_index in range(client_num_in_total)]
-    #     else:
-    #         num_clients = min(client_num_per_round, client_num_in_total)
-    #         np.random.seed(round_idx)  # make sure for each comparison, we are selecting the same clients each round
-    #         client_indexes = np.random.choice(range(client_num_in_total), num_clients, replace=False)
-    #     self.logger.info("client_indexes = %s" % str(client_indexes))
-    #     return client_indexes
-
 # ************************************************************************************************************ #
 
 # ************************************************************************************************************ #
@@ -131,35 +90,36 @@ class FedAvgTrainer(object):
 # ************************************************************************************************************ #
     def tx_time(self, client_indexes):
         # read the channel condition for corresponding cars.
-        channel_res = np.reshape(np.array(self.channel_data[self.channel_data['Time'] == self.time_counter * self.channel_data['Car'].isin(client_indexes)]["Distance to BS(4982,905)"]), (1, -1))
-        self.logger.debug("channel_res: {}".format(channel_res))
+        channel_res = np.reshape(np.array(channel_data[channel_data['Time'] == self.time_counter * channel_data['Car'].isin(client_indexes)]["Distance to BS(4982,905)"]), (1, -1))
+        logger.debug("channel_res: {}".format(channel_res))
 
         # linearly resolve the optimazation problem
         tmp_t = 1
-        while np.sum(weight * channel_res * res_ratio / tmp_t) > 1:
+        while np.sum(res_weight * channel_res * res_ratio / tmp_t) > 1:
             tmp_t += 1
 
         self.time_counter += tmp_t
-        self.logger.debug("time_counter after tx_time: {}".format(self.time_counter))
+        logger.debug("time_counter after tx_time: {}".format(self.time_counter))
 # ************************************************************************************************************ #
 
     def train(self):
 # ************************************************************************************************************ #
         # Initialized values
         local_itr_lst = np.zeros((1, self.args.comm_round)) # historical local iterations.
-        client_selec_lst = np.zeros((self.args.comm_round, self.args.client_num_in_total)) # historical client selections.
+        client_selec_lst = np.zeros((self.args.comm_round, client_num_in_total)) # historical client selections.
+        local_w_lst = [self.model_global.cpu().state_dict()] * client_num_in_total # maintain a lst for all clients to store local weights
 # ************************************************************************************************************ #
 
         for round_idx in range(self.args.comm_round):
-            self.logger.info("################Communication round : {}".format(round_idx))
-            self.logger.info("time_counter: {}".format(self.time_counter))
+            logger.info("################Communication round : {}".format(round_idx))
+            logger.info("time_counter: {}".format(self.time_counter))
 
             self.model_global.train()
 
 # ************************************************************************************************************ #
             last_w = self.model_global.cpu().state_dict() # store the last model's training parameters.
 
-            FPF_index_lst = np.zeros((1, self.args.client_num_in_total)) # FPF list
+            FPF_index_lst = np.zeros((1, client_num_in_total)) # FPF list
             w_locals, loss_locals, time_interval_lst = [], [], [] # Initialization
 # ************************************************************************************************************ #
 
@@ -177,11 +137,6 @@ class FedAvgTrainer(object):
 
             # contribute to time counter
             self.tx_time(client_indexes)
-
-# the following code is the code before the modification:
-
-            # client_indexes = self.client_sampling(round_idx, self.args.client_num_in_total, self.args.client_num_per_round)
-
 # ************************************************************************************************************ #
 
 # ************************************************************************************************************ #
@@ -190,7 +145,7 @@ class FedAvgTrainer(object):
             client_selec_lst[round_idx, client_indexes] = 1
 # ************************************************************************************************************ #
 
-            self.logger.info("client_indexes = " + str(client_indexes))
+            logger.info("client_indexes = " + str(client_indexes))
 
             for idx in range(len(client_indexes)):
                 # update dataset
@@ -204,9 +159,8 @@ class FedAvgTrainer(object):
                                             self.train_data_local_num_dict[dataset_idx])
 # ************************************************************************************************************ #
 
-                # train on new dataset
-
 # ************************************************************************************************************ #
+                # train on new dataset
                 # add a new parameter "local_itr" to the funciton "client.train()"
                 # add a new return value "time_interval" which is the time consumed for training model in client.
                 w, loss, time_interval = client.train(net=copy.deepcopy(self.model_global).to(self.device), local_iteration = local_itr)
@@ -214,45 +168,58 @@ class FedAvgTrainer(object):
                 # record current time interval into time_interval_lst
                 time_interval_lst.append(time_interval)
 
+                # update the local weights
+                local_w_lst[client_idx] = copy.deepcopy(w)
 # the following code is the code before the modification:
 
                 # w, loss = client.train(net=copy.deepcopy(self.model_global).to(self.device))
 
 # ************************************************************************************************************ #
 
-# ************************************************************************************************************ #
-                # calculate FPF index.
-                FPF_index = 0
-                for para in w.keys():
-                    FPF_index += torch.norm(w[para] - last_w[para])
-                FPF_index_lst[0, client_idx] = FPF_index / np.dot(local_itr_lst, client_selec_lst[:, client_idx])
-# ************************************************************************************************************ #
-
                 w_locals.append((client.get_sample_number(), copy.deepcopy(w)))
                 loss_locals.append(copy.deepcopy(loss))
-                self.logger.info('Client {:3d}, loss {:.3f}'.format(client_idx, loss))
+                logger.info('Client {:3d}, loss {:.3f}'.format(client_idx, loss))
+
+# ************************************************************************************************************ #
+            # calculate FPF1 index.
+            def FPF1_cal(local_w_lst):
+                def FPF1_norm_sum(w):
+                    norm_sum = 0
+                    for para in w.keys():
+                        norm_sum += torch.norm(w[para] - last_w[para])
+                    return norm_sum
+                
+                FPF1_norm_sum = np.reshape(np.array(list(map(FPF1_norm_sum, local_w_lst))), (1, -1))
+                # return FPF1 index list
+                return FPF1_norm_sum / np.dot(local_itr_lst, client_selec_lst)
+
+            FPF1_idx_lst = FPF1_cal(local_w_lst)
+
+            # calculate FPF2 index.
+            
+# ************************************************************************************************************ #
 
 # ************************************************************************************************************ #
             # update the time counter
             self.time_counter += sum(time_interval_lst) * timing_ratio / len(time_interval_lst)
-            self.logger.debug("time_counter after training: {}".format(self.time_counter))
+            logger.debug("time_counter after training: {}".format(self.time_counter))
             # if current time_counter has exceed the channel table, I will simply stop early
-            if self.time_counter >= self.channel_data['Time'].max(): 
-                self.logger.info("++++++++++++++training process ends early++++++++++++++")
+            if self.time_counter >= channel_data['Time'].max(): 
+                logger.info("++++++++++++++training process ends early++++++++++++++")
                 break
-            self.time_counter = np.array(self.channel_data['Time'][self.channel_data['Time'] > self.time_counter])[0]
+            self.time_counter = np.array(channel_data['Time'][channel_data['Time'] > self.time_counter])[0]
 # ************************************************************************************************************ #
 
             # update global weights
             w_glob = self.aggregate(w_locals)
-            # self.logger.info("global weights = " + str(w_glob))
+            # logger.info("global weights = " + str(w_glob))
 
             # copy weight to net_glob
             self.model_global.load_state_dict(w_glob)
 
             # print loss
             loss_avg = sum(loss_locals) / len(loss_locals)
-            self.logger.info('Round {:3d}, Average loss {:.3f}'.format(round_idx, loss_avg))
+            logger.info('Round {:3d}, Average loss {:.3f}'.format(round_idx, loss_avg))
 
             if round_idx % self.args.frequency_of_the_test == 0 or round_idx == self.args.comm_round - 1:
                 self.local_test_on_all_clients(self.model_global, round_idx)
@@ -275,7 +242,7 @@ class FedAvgTrainer(object):
         return averaged_params
 
     def local_test_on_all_clients(self, model_global, round_idx):
-        self.logger.info("################local_test_on_all_clients : {}".format(round_idx))
+        logger.info("################local_test_on_all_clients : {}".format(round_idx))
         train_metrics = {
             'num_samples' : [],
             'num_correct' : [],
@@ -294,7 +261,7 @@ class FedAvgTrainer(object):
 
         client = self.client_list[0]
 # ************************************************************************************************************ #
-        for client_idx in range(min(self.args.client_num_in_total, self.client_num)):
+        for client_idx in range(min(client_num_in_total, self.client_num)):
 # ************************************************************************************************************ #
             """
             Note: for datasets like "fed_CIFAR100" and "fed_shakespheare",
@@ -348,22 +315,22 @@ class FedAvgTrainer(object):
             wandb.log({"Train/Pre": train_precision, "round": round_idx})
             wandb.log({"Train/Rec": train_recall, "round": round_idx})
             wandb.log({"Train/Loss": train_loss, "round": round_idx})
-            self.logger.info(stats)
+            logger.info(stats)
 
             stats = {'test_acc': test_acc, 'test_precision': test_precision, 'test_recall': test_recall, 'test_loss': test_loss}
             wandb.log({"Test/Acc": test_acc, "round": round_idx})
             wandb.log({"Test/Pre": test_precision, "round": round_idx})
             wandb.log({"Test/Rec": test_recall, "round": round_idx})
             wandb.log({"Test/Loss": test_loss, "round": round_idx})
-            self.logger.info(stats)
+            logger.info(stats)
 
         else:
             stats = {'training_acc': train_acc, 'training_loss': train_loss}
             wandb.log({"Train/Acc": train_acc, "round": round_idx})
             wandb.log({"Train/Loss": train_loss, "round": round_idx})
-            self.logger.info(stats)
+            logger.info(stats)
 
             stats = {'test_acc': test_acc, 'test_loss': test_loss}
             wandb.log({"Test/Acc": test_acc, "round": round_idx})
             wandb.log({"Test/Loss": test_loss, "round": round_idx})
-            self.logger.info(stats)
+            logger.info(stats)

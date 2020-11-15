@@ -1,26 +1,23 @@
+# ************************************************************************************************************ # newly added libarary, to insert delay to the program.
 # system python package load.
 # from logging import log
 import argparse
 import logging
 import os
 import sys
-# ************************************************************************************************************ # newly added libarary, to insert delay to the program.
 import time
-# ************************************************************************************************************ #
 
 # Maching learning tool chain.
 import numpy as np
 import torch
 import wandb
 
-# ************************************************************************************************************ #
-sys.path.insert(0, os.path.abspath("/home/zzp1012/FedML")) # add the root dir of FedML
+from fedavg_trainer import FedAvgTrainer
+from config import *
 # ************************************************************************************************************ #
 
 # ************************************************************************************************************ #
-# set the logger
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger("training")
+sys.path.insert(0, os.path.abspath("/home/zzp1012/FedML")) # add the root dir of FedML
 # ************************************************************************************************************ #
 
 from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
@@ -41,9 +38,6 @@ from fedml_api.model.nlp.rnn import RNN_OriginalFedAvg, RNN_StackOverFlow
 
 from fedml_api.model.linear.lr import LogisticRegression
 from fedml_api.model.cv.resnet_gn import resnet18
-
-from fedavg_trainer import FedAvgTrainer
-
 
 def add_args(parser):
     """
@@ -80,12 +74,6 @@ def add_args(parser):
     parser.add_argument('--epochs', type=int, default=5, metavar='EP',
                         help='how many epochs will be trained locally')
 
-    parser.add_argument('--client_num_in_total', type=int, default=10, metavar='NN',
-                        help='number of workers in a distributed cluster')
-
-    parser.add_argument('--client_num_per_round', type=int, default=10, metavar='NN',
-                        help='number of workers')
-
     parser.add_argument('--comm_round', type=int, default=10,
                         help='how many round of communications we shoud use')
 
@@ -111,9 +99,6 @@ def add_args(parser):
 
 
 def load_data(args, dataset_name):
-    # check if the centralized training is enabled
-    centralized = True if args.client_num_in_total == 1 else False
-
     # check if the full-batch training is enabled
     args_batch_size = args.batch_size
     if args.batch_size <= 0:
@@ -121,9 +106,10 @@ def load_data(args, dataset_name):
         args.batch_size = 128 # temporary batch size
     else:
         full_batch = False
+    logger.info("------------dataset loading------------")
 
     if dataset_name == "mnist":
-        logger.info("load_data. dataset_name = %s" % dataset_name)
+        logger.debug("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_mnist(args.batch_size)
@@ -133,37 +119,37 @@ def load_data(args, dataset_name):
         """
 
     elif dataset_name == "femnist":
-        logger.info("load_data. dataset_name = %s" % dataset_name)
+        logger.debug("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_emnist(args.dataset, args.data_dir)
 
     elif dataset_name == "shakespeare":
-        logger.info("load_data. dataset_name = %s" % dataset_name)
+        logger.debug("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_shakespeare(args.batch_size)
 
     elif dataset_name == "fed_shakespeare":
-        logger.info("load_data. dataset_name = %s" % dataset_name)
+        logger.debug("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_shakespeare(args.dataset, args.data_dir)
 
     elif dataset_name == "fed_cifar100":
-        logger.info("load_data. dataset_name = %s" % dataset_name)
+        logger.debug("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_cifar100(args.dataset, args.data_dir)
 
     elif dataset_name == "stackoverflow_lr":
-        logger.info("load_data. dataset_name = %s" % dataset_name)
+        logger.debug("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_stackoverflow_lr(args.dataset, args.data_dir)
 
     elif dataset_name == "stackoverflow_nwp":
-        logger.info("load_data. dataset_name = %s" % dataset_name)
+        logger.debug("load_data. dataset_name = %s" % dataset_name)
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = load_partition_data_federated_stackoverflow_nwp(args.dataset, args.data_dir)
@@ -180,13 +166,7 @@ def load_data(args, dataset_name):
         client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, \
         class_num = data_loader(args.dataset, args.data_dir, args.partition_method,
-                                args.partition_alpha, args.client_num_in_total, args.batch_size)
-
-    if centralized:
-        train_data_local_num_dict = {0: sum(user_train_data_num for user_train_data_num in train_data_local_num_dict.values())}
-        train_data_local_dict = {0: [batch for cid in sorted(train_data_local_dict.keys()) for batch in train_data_local_dict[cid]]}
-        test_data_local_dict = {0: [batch for cid in sorted(test_data_local_dict.keys()) for batch in test_data_local_dict[cid]]}
-        args.client_num_in_total = 1
+                                args.partition_alpha, client_num_in_total, args.batch_size)
 
     if full_batch:
         train_data_global = combine_batches(train_data_global)
@@ -208,28 +188,29 @@ def combine_batches(batches):
     return [(full_x, full_y)]
 
 def create_model(args, model_name, output_dim):
-    logger.info("create_model. model_name = %s, output_dim = %s" % (model_name, output_dim))
+    logger.debug("-------------model setting-------------")
+    logger.debug("create_model. model_name = %s, output_dim = %s" % (model_name, output_dim))
     model = None
     if model_name == "lr" and args.dataset == "mnist":
-        logger.info("LogisticRegression + MNIST")
+        logger.debug("LogisticRegression + MNIST")
         model = LogisticRegression(28 * 28, output_dim)
     elif model_name == "cnn" and args.dataset == "femnist":
-        logger.info("CNN + FederatedEMNIST")
+        logger.debug("CNN + FederatedEMNIST")
         model = CNN_DropOut(False)
     elif model_name == "resnet18_gn" and args.dataset == "fed_cifar100":
-        logger.info("ResNet18_GN + Federated_CIFAR100")
+        logger.debug("ResNet18_GN + Federated_CIFAR100")
         model = resnet18()
     elif model_name == "rnn" and args.dataset == "shakespeare":
-        logger.info("RNN + shakespeare")
+        logger.debug("RNN + shakespeare")
         model = RNN_OriginalFedAvg()
     elif model_name == "rnn" and args.dataset == "fed_shakespeare":
-        logger.info("RNN + fed_shakespeare")
+        logger.debug("RNN + fed_shakespeare")
         model = RNN_OriginalFedAvg()
     elif model_name == "lr" and args.dataset == "stackoverflow_lr":
-        logger.info("lr + stackoverflow_lr")
+        logger.debug("lr + stackoverflow_lr")
         model = LogisticRegression(10000, output_dim) 
     elif model_name == "rnn" and args.dataset == "stackoverflow_nwp":
-        logger.info("RNN + stackoverflow_nwp")
+        logger.debug("RNN + stackoverflow_nwp")
         model = RNN_StackOverFlow()
     elif model_name == "resnet56":
         model = resnet56(class_num=output_dim)
@@ -245,18 +226,28 @@ if __name__ == "__main__":
     logger.setLevel(logging.DEBUG)
     if not args.verbose:
         logger.setLevel(logging.INFO)
-    logger.debug("--------DEBUG enviroment start--------")
+    logger.debug("--------DEBUG enviroment start---------")
 # ************************************************************************************************************ #
     
-    logger.info(args)
-    device = torch.device("cuda:" + str(args.gpu) if torch.cuda.is_available() else "cpu")
-    logger.info(device)
+# ************************************************************************************************************ #
+    # show the upate information
+    logger.debug("-------global parameters setting-------")
+    logger.debug("channel_data_dir {}".format(channel_data_dir))
+    logger.debug("client_num_in_total: {}".format(client_num_in_total))
+    logger.debug("client_num_in_total: {}".format(client_num_per_round))
+    logger.debug("bandwith: {}".format(bandwith))
+    logger.debug("res_weight: {}".format(res_weight))
+    logger.debug("res_ratio: {}".format(res_ratio))
+    logger.debug("timing_ratio: {}".format(timing_ratio))
+# ************************************************************************************************************ #
 
-    wandb.init(
-        project="fedavg",
-        name="FedAVG-r" + str(args.comm_round) + "-e" + str(args.epochs) + "-lr" + str(args.lr),
-        config=args
-    )
+    logger.debug("------ordinary parameter setting-------")
+    logger.info(args)
+
+
+    device = torch.device("cuda:" + str(args.gpu) if torch.cuda.is_available() else "cpu")
+    logger.debug("---------cuda device setting-----------")
+    logger.debug(device)
 
     # Set the random seed. The np.random seed determines the dataset partition.
     # The torch_manual_seed determines the initial weight.
@@ -266,6 +257,20 @@ if __name__ == "__main__":
 
     # load data
     dataset = load_data(args, args.dataset)
+
+    # create model.
+    # Note if the model is DNN (e.g., ResNet), the training will be very slow.
+    # In this case, please use our FedML distributed version (./fedml_experiments/distributed_fedavg)
+    model = create_model(args, model_name=args.model, output_dim=dataset[-1])
+    logger.debug(model)
+    logger.debug("------------setting ends---------------")
+
+
+    wandb.init(
+        project="fedavg",
+        name="FedAVG-r" + str(args.comm_round) + "-e" + str(args.epochs) + "-lr" + str(args.lr),
+        config=args
+    )
 
 # ************************************************************************************************************ #
     # run scheduler in background.
@@ -277,11 +282,5 @@ if __name__ == "__main__":
     time.sleep(5) 
 # ************************************************************************************************************ #
 
-    # create model.
-    # Note if the model is DNN (e.g., ResNet), the training will be very slow.
-    # In this case, please use our FedML distributed version (./fedml_experiments/distributed_fedavg)
-    model = create_model(args, model_name=args.model, output_dim=dataset[-1])
-    logger.info(model)
-
-    trainer = FedAvgTrainer(dataset, model, device, args, logger)
+    trainer = FedAvgTrainer(dataset, model, device, args)
     trainer.train()
