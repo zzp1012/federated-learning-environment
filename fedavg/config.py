@@ -23,4 +23,8 @@ client_num_per_round = 100 # number of local clients
 # set the logger
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("training")
+
+# set hyperparameter for calculating FPF2 index
+G1 = 2
+G2 = 2
 # ************************************************************************************************************ #

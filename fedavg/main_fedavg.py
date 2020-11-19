@@ -92,6 +92,10 @@ def add_args(parser):
     # set the scheduler method
     parser.add_argument("-m", "--method", type= str, default="sch_random",
                         help="declare the benchmark methods you use")
+
+    # set which FPF index to use
+    parser.add_argument("--FPF", type= int, default=1,
+                        help="declare which type of FPF index you use")
 # ************************************************************************************************************ #
 
     args = parser.parse_args()
