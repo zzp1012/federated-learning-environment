@@ -26,8 +26,6 @@ METHOD=$12
 
 VERBOSE=$13 #-v
 
-FPF=$14
-
 python3 ./main_fedavg.py \
 --gpu $GPU \
 --dataset $DATASET \
@@ -41,5 +39,4 @@ python3 ./main_fedavg.py \
 --lr $LR \
 --ci $CI \
 --method $METHOD \
-$VERBOSE \
---FPF $FPF
+$VERBOSE
