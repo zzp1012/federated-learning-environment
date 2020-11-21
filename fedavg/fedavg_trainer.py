@@ -32,7 +32,6 @@ class FedAvgTrainer(object):
         self.train_data_local_dict = train_data_local_dict
         self.test_data_local_dict = test_data_local_dict
         self.setup_clients(train_data_local_num_dict, train_data_local_dict, test_data_local_dict)
-
 # ************************************************************************************************************ #
         # time counter starts from the first line
         self.time_counter = channel_data['Time'][0]
@@ -74,14 +73,14 @@ class FedAvgTrainer(object):
 # ************************************************************************************************************ #
 
 # ************************************************************************************************************ #
-    def feedback(self, loss_locals, FPF1_idx_lst):
+    def feedback(self, loss_locals, FPF1_idx_lst, FPF2_idx_lst):
         # setup client
         hostname = socket.gethostname()
         client_socket = socket.socket()
         client_socket.connect((hostname, 8999))
 
-        # send time_counter & local_losses & FPF1_index
-        message = str(self.time_counter) + ',' + str(loss_locals)[1:-1].replace(',', '') + ',' +  str(list(FPF1_idx_lst.ravel()))[1:-1].replace(',', '')
+        # send time_counter & local_losses & FPF1_index & FPF2_index
+        message = str(self.time_counter) + ',' + str(loss_locals)[1:-1].replace(',', '') + ',' +  str(list(FPF1_idx_lst.ravel()))[1:-1].replace(',', '') + ',' +  str(list(FPF2_idx_lst.ravel()))[1:-1].replace(',', '')
         client_socket.sendall(message.encode())
 
         # get response
@@ -110,12 +109,19 @@ class FedAvgTrainer(object):
 
     def train(self):
 # ************************************************************************************************************ #
-        # Initialized values
+        # Initialize values
         local_itr_lst = np.zeros((1, self.args.comm_round)) # historical local iterations.
         client_selec_lst = np.zeros((self.args.comm_round, client_num_in_total)) # historical client selections.
         local_w_lst = [self.model_global.cpu().state_dict()] * client_num_in_total # maintain a lst for all clients to store local weights
-        FPF1_idx_lst = np.zeros((1, client_num_in_total)) # maintain a lst for FPF1 indexes
         loss_locals = [] # initial a lst to store loss values
+        FPF1_idx_lst = np.zeros((1, client_num_in_total)) # maintain a lst for FPF1 indexes
+        FPF2_idx_lst = np.zeros((1, client_num_in_total)) # maintain a lst for FPF2 indexes
+        # Initialize A for calculating FPF2 index
+        A_mat = dict()
+        for para in self.model_global.state_dict().keys():
+            weight_shape = self.model_global.state_dict()[para].numpy().ravel().shape[0]
+            A_mat[para] = np.ones(weight_shape) # initial the value of A with zero.
+        G_mat = np.zeros((1, client_num_in_total)) # initial the value of G with zero
 # ************************************************************************************************************ #
         for round_idx in range(self.args.comm_round):
             logger.info("################Communication round : {}".format(round_idx))
@@ -124,7 +130,7 @@ class FedAvgTrainer(object):
             self.model_global.train()
 # ************************************************************************************************************ #
             # update time counter on scheduler
-            self.feedback(loss_locals, FPF1_idx_lst)
+            self.feedback(loss_locals, FPF1_idx_lst, FPF2_idx_lst)
             # change to the newly defined client_sampling function.
             client_indexes, local_itr = self.client_sampling()
             # contribute to time counter
@@ -187,10 +193,24 @@ class FedAvgTrainer(object):
                 res[np.bitwise_or(np.isnan(res), np.isinf(res))] = 0
                 return res
 
+            # update FPF index list
             FPF1_idx_lst = FPF1_cal(local_w_lst)
 
             # calculate FPF2 index.
-            
+            def FPF2_cal(local_w_lst):
+                def FPF2_numerator(w):
+                    res = 0
+                    for para in w.keys():
+                        res += np.linalg.norm(w[para].numpy().ravel() * A_mat[para])
+                    return res
+                
+                numerators = np.reshape(np.array(list(map(FPF2_numerator, local_w_lst))), (1, -1))
+                res = numerators / G_mat
+                res[np.bitwise_or(np.isnan(res), np.isinf(res))] = 0
+                return res
+
+            # update FPF index list
+            FPF2_idx_lst = FPF2_cal(local_w_lst)
 # ************************************************************************************************************ #
 
 # ************************************************************************************************************ #
@@ -213,6 +233,13 @@ class FedAvgTrainer(object):
             self.model_global.load_state_dict(w_glob)
 
 # ************************************************************************************************************ #
+            # update A_mat
+            for para in w_glob.keys():
+                A_mat[para] = A_mat[para] * (1 - 1/G2) + (w_glob[para].numpy().ravel() - last_w[para].numpy().ravel()) / G2
+
+            # update G_mat
+            G_mat = G_mat * (1 - 1 / G1) + np.dot(local_itr_lst, client_selec_lst) / G1
+            
             # print loss
             if not loss_locals:
                 logger.info('Round {:3d}, Average loss None'.format(round_idx))

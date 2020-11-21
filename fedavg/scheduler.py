@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import os
 import logging
+import time
 
 # set the logger
 logging.basicConfig(level=logging.DEBUG)
@@ -122,11 +123,12 @@ def main():
         client, addr = server.accept() # connected to client.
         logger.info("round " + str(round_idx) + " connected address: " + str(addr)) # print connection message.
 
+        time.sleep(0.5)
         response = client.recv(1000000).decode()
+        time.sleep(0.5)
 
         # initialization
-        loss_locals = []
-        FPF1_idx_lst = []
+        loss_locals, FPF1_idx_lst, FPF2_idx_lst = [], [], []
         
         if response != "nothing":
             response = response.split(',')
@@ -136,6 +138,10 @@ def main():
                 loss_locals = [float(i) for i in response[1].split(' ')]
             if response[2] != '':
                 FPF1_idx_lst = [float(i) for i in response[2].split(' ')]
+            if response[3] != '':
+                FPF2_idx_lst = [float(i) for i in response[3].split(' ')]
+
+        # logger.debug(FPF2_idx_lst)
         
         mes = scheduler(round_idx, time_counter)
         client.send(mes.encode()) # send the message to the connected client.

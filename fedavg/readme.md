@@ -17,7 +17,15 @@
     ```
 
 ## Experiment Scripts
+
 Heterogeneous distribution (Non-IID) experiment:
+
+Before any experiments, remember to kill any process occupying port 8999. Simply, you can run the following script:
+
+```bash
+lsof -i:8999 # this instruction could show the PID of the process occupying port 8999
+kill PID
+```
 
 Frond-end debugging:
 ``` 
@@ -53,7 +61,6 @@ nohup sh run_fedavg_standalone_pytorch.sh 2 10 mnist ./../../../data/mnist lr he
 ```
 
 For large DNNs (ResNet, Transformer, etc), please use the distributed computing (fedml_api/distributed). 
-
 
 ### Benchmark Results
 We publish benchmark experimental results at wanb.com: \
