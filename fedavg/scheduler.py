@@ -171,14 +171,8 @@ def main():
         time.sleep(0.5)
 
         # initialization
-<<<<<<< HEAD
         loss_locals, FPF1_idx_lst, FPF2_idx_lst = [], [], []
         
-=======
-        # loss_locals = [] # remove to the global initialization
-        FPF1_idx_lst = []
-
->>>>>>> c6b6ba47245d3e2ec5385f180f32e1d4443367fd
         if response != "nothing":
             response = response.split(',')
             if response[0] != '':
@@ -187,7 +181,6 @@ def main():
                 loss_locals = [float(i) for i in response[1].split(' ')]
             if response[2] != '':
                 FPF1_idx_lst = [float(i) for i in response[2].split(' ')]
-<<<<<<< HEAD
             if response[3] != '':
                 FPF2_idx_lst = [float(i) for i in response[3].split(' ')]
 
@@ -195,8 +188,6 @@ def main():
         
         mes = scheduler(round_idx, time_counter)
         client.send(mes.encode()) # send the message to the connected client.
-=======
->>>>>>> c6b6ba47245d3e2ec5385f180f32e1d4443367fd
 
         mes = scheduler(round_idx, time_counter)
         client.send(mes.encode())  # send the message to the connected client.
