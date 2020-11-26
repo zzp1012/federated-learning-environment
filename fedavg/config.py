@@ -2,6 +2,7 @@
 import logging
 import pandas as pd
 import os
+from tensorboardX import SummaryWriter
 
 # set the requirement.
 bandwith = 1
@@ -9,7 +10,7 @@ res_weight = 0.5
 res_ratio = 0.1 # the ratio of radio_res
 
 # the ratio of standalone training time over real distributed learning training time.
-timing_ratio = 10 
+timing_ratio = 10
 
 # set the data dir
 channel_data_dir = "../data"
@@ -22,12 +23,16 @@ client_num_per_round = 100 # number of local clients
 
 # set the logger
 logging.basicConfig(
-                    filename = "logfile",
-                    filemode = "w+",
+                    # filename = "logfile",
+                    # filemode = "w+",
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt = "%H:%M:%S",
                     level=logging.DEBUG)
 logger = logging.getLogger("training")
+
+# setup the tensorboardX
+
+boardX = SummaryWriter(comment="-fedavg")
 
 # set hyperparameter for calculating FPF2 index
 G1 = 2

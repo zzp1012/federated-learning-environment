@@ -347,6 +347,12 @@ class FedAvgTrainer(object):
             wandb.log({"Train/Pre": train_precision, "round": round_idx})
             wandb.log({"Train/Rec": train_recall, "round": round_idx})
             wandb.log({"Train/Loss": train_loss, "round": round_idx})
+
+            boardX.add_scalar("Train/Acc", train_acc, round_idx)
+            boardX.add_scalar("Train/Pre", train_precision, round_idx)
+            boardX.add_scalar("Train/Rec", train_recall, round_idx)
+            boardX.add_scalar("Train/Loss", train_loss, round_idx)
+
             logger.info(stats)
 
             stats = {'test_acc': test_acc, 'test_precision': test_precision, 'test_recall': test_recall, 'test_loss': test_loss}
@@ -354,15 +360,29 @@ class FedAvgTrainer(object):
             wandb.log({"Test/Pre": test_precision, "round": round_idx})
             wandb.log({"Test/Rec": test_recall, "round": round_idx})
             wandb.log({"Test/Loss": test_loss, "round": round_idx})
+
+            boardX.add_scalar("Test/Acc", test_acc, round_idx)
+            boardX.add_scalar("Test/Pre", test_precision, round_idx)
+            boardX.add_scalar("Test/Rec", test_recall, round_idx)
+            boardX.add_scalar("Test/Loss", test_loss, round_idx)
+
             logger.info(stats)
 
         else:
             stats = {'training_acc': train_acc, 'training_loss': train_loss}
             wandb.log({"Train/Acc": train_acc, "round": round_idx})
             wandb.log({"Train/Loss": train_loss, "round": round_idx})
+
+            boardX.add_scalar("Train/Acc", train_acc, round_idx)
+            boardX.add_scalar("Train/Loss", train_loss, round_idx)
+
             logger.info(stats)
 
             stats = {'test_acc': test_acc, 'test_loss': test_loss}
             wandb.log({"Test/Acc": test_acc, "round": round_idx})
             wandb.log({"Test/Loss": test_loss, "round": round_idx})
+
+            boardX.add_scalar("Test/Acc", test_acc, round_idx)
+            boardX.add_scalar("Test/Loss", test_loss, round_idx)
+
             logger.info(stats)
