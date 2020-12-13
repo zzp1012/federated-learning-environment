@@ -196,9 +196,6 @@ def main():
         mes = scheduler(round_idx, time_counter)
         client.send(mes.encode()) # send the message to the connected client.
 
-        mes = scheduler(round_idx, time_counter)
-        client.send(mes.encode())  # send the message to the connected client.
-
         client.close()  # close the connection
 
         round_idx = round_idx + 1  # record the current round of aggregation.
