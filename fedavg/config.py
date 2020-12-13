@@ -25,7 +25,7 @@ client_num_per_round = 100 # number of local clients
 logging.basicConfig(
                     # filename = "logfile",
                     # filemode = "w+",
-                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    format='%(name)s %(levelname)s %(message)s',
                     datefmt = "%H:%M:%S",
                     level=logging.DEBUG)
 logger = logging.getLogger("training")

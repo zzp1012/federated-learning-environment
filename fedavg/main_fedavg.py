@@ -9,16 +9,16 @@ import time
 
 # Maching learning tool chain.
 import numpy as np
+import numexpr as ne
 import torch
 import wandb
 
 from fedavg_trainer import FedAvgTrainer
 from config import *
-# ************************************************************************************************************ #
 
+ne.set_num_threads(16)
 # ************************************************************************************************************ #
 sys.path.insert(0, os.path.abspath("/home/zzp1012/FedML")) # add the root dir of FedML
-# ************************************************************************************************************ #
 
 from fedml_api.data_preprocessing.cifar10.data_loader import load_partition_data_cifar10
 from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
