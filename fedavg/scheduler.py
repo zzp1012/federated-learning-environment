@@ -20,6 +20,9 @@ channel_data = pd.concat(
     [pd.read_csv(os.path.join(channel_data_dir, csv_name)) for csv_name in os.listdir(channel_data_dir)],
     ignore_index=True)
 
+# find the client_num_in_total
+client_num_in_total = channel_data['Car'].max() + 1
+
 # used for round robin
 queue = []
 # used for sch_loss
@@ -159,19 +162,20 @@ def main():
 
     round_idx = 0
 
-    # set the global time_counter
+    # Initialization
     time_counter = 0
+    local_loss_lst = np.zeros((1, client_num_in_total)) # maintain a lst for local losses
 
     while True:
         client, addr = server.accept()  # connected to client.
         logger.info("round " + str(round_idx) + " connected address: " + str(addr))  # print connection message.
 
         time.sleep(0.5)
-        response = client.recv(1000000).decode()
+        response = client.recv(10000000).decode()
         time.sleep(0.5)
 
         # initialization
-        loss_locals, FPF1_idx_lst, FPF2_idx_lst = [], [], []
+        loss_locals, FPF1_idx_lst, FPF2_idx_lst, client_indexes = [], [], [], []
         
         if response != "nothing":
             response = response.split(',')
@@ -183,8 +187,11 @@ def main():
                 FPF1_idx_lst = [float(i) for i in response[2].split(' ')]
             if response[3] != '':
                 FPF2_idx_lst = [float(i) for i in response[3].split(' ')]
-
-        # logger.debug(FPF2_idx_lst)
+            if response[4] != '':
+                client_indexes = [int(i) for i in response[4].split(' ')]
+        
+        if client_indexes and loss_locals:
+            local_loss_lst[0, client_indexes] = loss_locals
         
         mes = scheduler(round_idx, time_counter)
         client.send(mes.encode()) # send the message to the connected client.
